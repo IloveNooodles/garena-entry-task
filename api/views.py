@@ -32,7 +32,7 @@ def find_user(request):
 def get_heroes(request, *args, **kwargs):
     if request.method == "GET":
         try:
-            file_name = os.path.join(settings.BASE_DIR, "api", "data", "champion.json")
+            file_name = os.path.join(settings.BASE_DIR, "data", "champion.json")
             print(file_name)
             print(settings.BASE_DIR)
             with open(file_name, "r") as file_champion:
