@@ -13,12 +13,8 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 from pathlib import Path
 import environ
 
-
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Read Env
 env = environ.Env()
 environ.Env().read_env()
 
@@ -29,7 +25,7 @@ environ.Env().read_env()
 SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env("DEBUG_MODE")
+DEBUG = env("DEBUG")
 
 ALLOWED_HOSTS = []
 
@@ -83,10 +79,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': env("MYSQL_NAME"),
-        'USER': env("MYSQL_USER"),
-        'PASSWORD': env("MYSQL_PASSWORD"),
-        'HOST': env("MYSQL_HOST"),
-        'PORT': env("MYSQL_PORT"),
+        "USER": env("MYSQL_USER"),
+        "PASSWORD": env("MYSQL_PASS"),
+        "HOST": env("MYSQL_HOST"),
+        "PORT": env("MYSQL_PORT")
     }
 }
 
