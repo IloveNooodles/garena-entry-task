@@ -2,8 +2,9 @@ Django==3.2.4
 mysql-connector-python
 pymysql
 django-redis==5.2.0
-pyjwt==2.4.0
+pyjwt
 django-debug-toolbar==3.6.0
 environ
 django-environ
 virtualenv
+bcrypt
