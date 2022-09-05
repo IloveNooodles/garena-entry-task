@@ -1,4 +1,5 @@
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.conf import settings
 from django.core.cache import cache
@@ -13,8 +14,16 @@ CACHE_TTL = getattr(settings, 'CACHE_TTL', TIMEOUT)
 
 
 @require_http_methods(["POST"])
+@csrf_exempt
 def register(request):
-    pass
+    if request.method == "POST" and request.headers["Content-Type"] == "application/json":
+        request_body = json.loads(request.body)
+        # TODO do validation and checking also encrypt pass
+        return JsonResponse({"Status": "Ok", "Data": []})
+
+
+    logger.log().error("Method not allowed")
+    return JsonResponse({"Status": "Error", "Message": "Method not allowed"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
 
 
 def login(request):
@@ -66,5 +75,7 @@ def heroes(request, *args, **kwargs):
         except Exception as e:
             logger.log().error(str(e))
             return JsonResponse(
-                {"Status": "Error", "Data": []}, status=HTTPStatus.INTERNAL_SERVER_ERROR
+                {"Status": "Error", "Message": "Error when fetching data"}, status=HTTPStatus.INTERNAL_SERVER_ERROR
             )
+    logger.log().error("Method not allowed")
+    return JsonResponse({"Status": "Error", "Message": "Method not allowed"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
