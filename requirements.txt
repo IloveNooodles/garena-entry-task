@@ -9,3 +9,4 @@ django-environ
 bcrypt
 black
 requests
+uuid
