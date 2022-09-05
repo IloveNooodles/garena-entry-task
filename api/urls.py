@@ -1,6 +1,4 @@
 from django.urls import path
-from .views import get_heroes
+from .views import heroes
 
-urlpatterns = [
-    path("", get_heroes, name="index")
-]
+urlpatterns = [path("heroes", heroes, name="index")]
