@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.cache import cache
 from entry_task.logger import Logger
 from entry_task.hash import HashPassword
+from entry_task.jwt_auth import JWTAuth
 from http import HTTPStatus
 from api.models import User
 import json
@@ -131,8 +132,61 @@ def login(request):
         request.method == "POST"
         and request.headers["Content-Type"] == "application/json"
     ):
-        pass
+        request_body = json.loads(request.body)
+        
+        # Payload validation
+        if "username" and "password" not in request_body:
+            logger.log().error("Incomplete request body")
+            return JsonResponse(
+                {
+                    "Status": "Error",
+                    "Data": [],
+                    "Message": "Please fill the request body correctly",
+                },
+                status=HTTPStatus.BAD_REQUEST,
+            )
+        
+        # Check for matching username
+        user = User.find_user_by_username(User, request_body["username"])
+        
+        if not user:
+            logger.log().error("No user found ")
+            return JsonResponse(
+                {
+                    "Status": "Error",
+                    "Data": [],
+                    "Message": "No user found",
+                },
+                status=HTTPStatus.NOT_FOUND,
+            )
 
+        # Check for password
+        hashInstance = HashPassword(request_body["password"])
+        is_matched = hashInstance.check(user.password)
+        
+        if not is_matched:
+            logger.log().error("Password didn't match")
+            return JsonResponse(
+                {
+                    "Status": "Error",
+                    "Data": [],
+                    "Message": "Incorrect Password",
+                },
+                status=HTTPStatus.UNPROCESSABLE_ENTITY,
+            )
+        
+        # Send the JWT
+        payload = {
+            "username": request_body["username"],
+            "password": request_body["password"]
+        }
+        
+        jwtInstance = JWTAuth()
+        token = jwtInstance.encode(payload)
+
+        logger.log().info("Successfuly login")
+        return JsonResponse({"Status": "Ok", "Data": {"Token": token}, "Message": "Successfuly login"})
+        
     logger.log().error("Method not allowed")
     return JsonResponse(
         {"Status": "Error", "Data": [], "Message": "Method not allowed"},
