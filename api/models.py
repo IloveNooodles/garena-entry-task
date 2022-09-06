@@ -26,7 +26,7 @@ class User(models.Model):
 
     def find_user_by_ref(self, ref_code):
         try:
-            user = self.objects.get(ref_code=ref_code)
+            user = self.objects.get(referal_code=ref_code)
             return user
         except Exception as e:
             log.error(str(e))

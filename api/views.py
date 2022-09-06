@@ -1,14 +1,18 @@
+from datetime import datetime
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.conf import settings
 from django.core.cache import cache
 from entry_task.logger import Logger
+from entry_task.hash import HashPassword
 from http import HTTPStatus
 from api.models import User
 import json
 import requests
-import bcrypt
+import uuid
 
 URL = "https://ddragon.leagueoflegends.com/cdn/6.24.1/data/en_US/champion.json"
 TIMEOUT = 3600  # in second
@@ -18,30 +22,50 @@ CACHE_TTL = getattr(settings, 'CACHE_TTL', TIMEOUT)
 @require_http_methods(["POST"])
 @csrf_exempt
 def register(request):
+    logger = Logger("register")
     if request.method == "POST" and request.headers["Content-Type"] == "application/json":
         request_body = json.loads(request.body)
-        
+
         # check all the field
         if "username" and "password" and "name" and "email" not in request_body:
             return JsonResponse({"Status": "Error", "Data": [], "Message": "Please fill the request body correctly"}, status=HTTPStatus.BAD_REQUEST)
-        
+
         # find user by ref code
         referred_user = None
-        referred_user_id = None
         if "ref_code" in request_body:
-            referred_user = User.find_user_by_ref(request_body["ref_code"])
-        
-        if referred_user:
-            referred_user_id = referred_user.id
-        
+            referred_user = User.find_user_by_ref(User, request_body["ref_code"])
+            print(referred_user)
+
+        if not referred_user and "ref_code" in request_body:
+            return JsonResponse({"Status": "Error", "Data": [], "Message": "No user found with inputted referral code"}, status=HTTPStatus.NOT_FOUND)
+
         # Username validation
-        if not User.find_user_by_username(request_body["username"]):
+        print(request_body["username"])
+        if User.find_user_by_username(User, username=request_body["username"]):
             return JsonResponse({"Status": "Error", "Data": [], "Message": "Username is already exists"}, status=HTTPStatus.CONFLICT)
         
-        user_to_add = User(username=request_body["username"])      
-        
-        return JsonResponse({"Status": "Ok", "Data": []})
+        # Email validation
+        try:
+            validate_email(request_body["email"])
+        except ValidationError as e:
+            logger.log().error(str(e))
+            return JsonResponse({"Status": "Error", "Data": [], "Message": "Please provide correct email"}, status=HTTPStatus.UNPROCESSABLE_ENTITY)
 
+        # Hash Password
+        hashInstance = HashPassword(request_body["password"])
+        hashed_password = hashInstance.hash()
+        
+        # random ref_code
+        referral_code = str(uuid.uuid4())
+        
+        # Create user        
+        user_to_add = User(username=request_body["username"], password=hashed_password, name=request_body["name"], email=request_body["email"], referal_code=referral_code, created_at=datetime.now(), updated_at=datetime.now())
+        
+        if referred_user:
+            user_to_add.referred_by = referred_user
+            
+        user_to_add.save()      
+        return JsonResponse({"Status": "Ok", "Data": json.loads(user_to_add), "Message": "Successfuly create new user"}, status=HTTPStatus.CREATED)
 
     logger.log().error("Method not allowed")
     return JsonResponse({"Status": "Error", "Message": "Method not allowed"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
@@ -65,8 +89,8 @@ def find_user(request):
 
 @require_http_methods(["GET"])
 def heroes(request, *args, **kwargs):
+    logger = Logger("heroes")
     if request.method == "GET":
-        logger = Logger("heroes")
         try:
             response = []
             champion_data = requests.get(URL)
@@ -100,5 +124,3 @@ def heroes(request, *args, **kwargs):
             )
     logger.log().error("Method not allowed")
     return JsonResponse({"Status": "Error", "Message": "Method not allowed"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
-
-# django admin itu passwordnya udah di hash, nanti baca docsnya aja cuma sebenernya make enkripsi lain juga ga masalah
