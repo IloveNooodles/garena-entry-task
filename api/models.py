@@ -2,6 +2,8 @@ from django.db import models
 import logging
 
 log = logging.getLogger()
+
+
 class User(models.Model):
     username = models.CharField(unique=True, max_length=255)
     password = models.CharField(max_length=255)
