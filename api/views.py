@@ -16,59 +16,108 @@ import uuid
 
 URL = "https://ddragon.leagueoflegends.com/cdn/6.24.1/data/en_US/champion.json"
 TIMEOUT = 3600  # in second
-CACHE_TTL = getattr(settings, 'CACHE_TTL', TIMEOUT)
+CACHE_TTL = getattr(settings, "CACHE_TTL", TIMEOUT)
 
 
 @require_http_methods(["POST"])
 @csrf_exempt
 def register(request):
     logger = Logger("register")
-    if request.method == "POST" and request.headers["Content-Type"] == "application/json":
+    if (
+        request.method == "POST"
+        and request.headers["Content-Type"] == "application/json"
+    ):
         request_body = json.loads(request.body)
 
         # check all the field
         if "username" and "password" and "name" and "email" not in request_body:
-            return JsonResponse({"Status": "Error", "Data": [], "Message": "Please fill the request body correctly"}, status=HTTPStatus.BAD_REQUEST)
+            return JsonResponse(
+                {
+                    "Status": "Error",
+                    "Data": [],
+                    "Message": "Please fill the request body correctly",
+                },
+                status=HTTPStatus.BAD_REQUEST,
+            )
 
         # find user by ref code
         referred_user = None
         if "ref_code" in request_body:
             referred_user = User.find_user_by_ref(User, request_body["ref_code"])
-            print(referred_user)
 
         if not referred_user and "ref_code" in request_body:
-            return JsonResponse({"Status": "Error", "Data": [], "Message": "No user found with inputted referral code"}, status=HTTPStatus.NOT_FOUND)
+            return JsonResponse(
+                {
+                    "Status": "Error",
+                    "Data": [],
+                    "Message": "No user found with inputted referral code",
+                },
+                status=HTTPStatus.NOT_FOUND,
+            )
 
         # Username validation
-        print(request_body["username"])
         if User.find_user_by_username(User, username=request_body["username"]):
-            return JsonResponse({"Status": "Error", "Data": [], "Message": "Username is already exists"}, status=HTTPStatus.CONFLICT)
-        
+            return JsonResponse(
+                {
+                    "Status": "Error",
+                    "Data": [],
+                    "Message": "Username is already exists",
+                },
+                status=HTTPStatus.CONFLICT,
+            )
+
         # Email validation
         try:
             validate_email(request_body["email"])
         except ValidationError as e:
             logger.log().error(str(e))
-            return JsonResponse({"Status": "Error", "Data": [], "Message": "Please provide correct email"}, status=HTTPStatus.UNPROCESSABLE_ENTITY)
+            return JsonResponse(
+                {
+                    "Status": "Error",
+                    "Data": [],
+                    "Message": "Please provide correct email",
+                },
+                status=HTTPStatus.UNPROCESSABLE_ENTITY,
+            )
 
         # Hash Password
         hashInstance = HashPassword(request_body["password"])
         hashed_password = hashInstance.hash()
-        
+
         # random ref_code
         referral_code = str(uuid.uuid4())
-        
-        # Create user        
-        user_to_add = User(username=request_body["username"], password=hashed_password, name=request_body["name"], email=request_body["email"], referal_code=referral_code, created_at=datetime.now(), updated_at=datetime.now())
-        
+
+        # Create user
+        user_to_add = User(
+            username=request_body["username"],
+            password=hashed_password,
+            name=request_body["name"],
+            email=request_body["email"],
+            referal_code=referral_code,
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        )
+
         if referred_user:
             user_to_add.referred_by = referred_user
-            
-        user_to_add.save()      
-        return JsonResponse({"Status": "Ok", "Data": json.loads(user_to_add), "Message": "Successfuly create new user"}, status=HTTPStatus.CREATED)
+
+        user_to_add.save()
+        response = request_body
+        response["password"] = hashed_password
+        return JsonResponse(
+            {
+                "Status": "Ok",
+                "Data": response,
+                "Message": "Successfuly create new user",
+            },
+            status=HTTPStatus.CREATED,
+        )
 
     logger.log().error("Method not allowed")
-    return JsonResponse({"Status": "Error", "Message": "Method not allowed"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
+    return JsonResponse(
+        {"Status": "Error", "Message": "Method not allowed"},
+        status=HTTPStatus.METHOD_NOT_ALLOWED,
+    )
 
 
 def login(request):
@@ -120,7 +169,11 @@ def heroes(request, *args, **kwargs):
         except Exception as e:
             logger.log().error(str(e))
             return JsonResponse(
-                {"Status": "Error", "Message": "Error when fetching data"}, status=HTTPStatus.INTERNAL_SERVER_ERROR
+                {"Status": "Error", "Message": "Error when fetching data"},
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
     logger.log().error("Method not allowed")
-    return JsonResponse({"Status": "Error", "Message": "Method not allowed"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
+    return JsonResponse(
+        {"Status": "Error", "Message": "Method not allowed"},
+        status=HTTPStatus.METHOD_NOT_ALLOWED,
+    )

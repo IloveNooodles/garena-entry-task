@@ -1,5 +1,6 @@
 import bcrypt
 
+
 class HashPassword:
     def __init__(self, password):
         self.password = password.encode("latin-1")
