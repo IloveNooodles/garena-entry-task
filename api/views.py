@@ -5,8 +5,10 @@ from django.conf import settings
 from django.core.cache import cache
 from entry_task.logger import Logger
 from http import HTTPStatus
+from api.models import User
 import json
 import requests
+import bcrypt
 
 URL = "https://ddragon.leagueoflegends.com/cdn/6.24.1/data/en_US/champion.json"
 TIMEOUT = 3600  # in second
@@ -18,7 +20,26 @@ CACHE_TTL = getattr(settings, 'CACHE_TTL', TIMEOUT)
 def register(request):
     if request.method == "POST" and request.headers["Content-Type"] == "application/json":
         request_body = json.loads(request.body)
-        # TODO do validation and checking also encrypt pass
+        
+        # check all the field
+        if "username" and "password" and "name" and "email" not in request_body:
+            return JsonResponse({"Status": "Error", "Data": [], "Message": "Please fill the request body correctly"}, status=HTTPStatus.BAD_REQUEST)
+        
+        # find user by ref code
+        referred_user = None
+        referred_user_id = None
+        if "ref_code" in request_body:
+            referred_user = User.find_user_by_ref(request_body["ref_code"])
+        
+        if referred_user:
+            referred_user_id = referred_user.id
+        
+        # Username validation
+        if not User.find_user_by_username(request_body["username"]):
+            return JsonResponse({"Status": "Error", "Data": [], "Message": "Username is already exists"}, status=HTTPStatus.CONFLICT)
+        
+        user_to_add = User(username=request_body["username"])      
+        
         return JsonResponse({"Status": "Ok", "Data": []})
 
 
@@ -79,3 +100,5 @@ def heroes(request, *args, **kwargs):
             )
     logger.log().error("Method not allowed")
     return JsonResponse({"Status": "Error", "Message": "Method not allowed"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
+
+# django admin itu passwordnya udah di hash, nanti baca docsnya aja cuma sebenernya make enkripsi lain juga ga masalah
