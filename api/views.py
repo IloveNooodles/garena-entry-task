@@ -31,6 +31,7 @@ def register(request):
 
         # check all the field
         if "username" and "password" and "name" and "email" not in request_body:
+            logger.log().error("Incomplete request body")
             return JsonResponse(
                 {
                     "Status": "Error",
@@ -46,6 +47,7 @@ def register(request):
             referred_user = User.find_user_by_ref(User, request_body["ref_code"])
 
         if not referred_user and "ref_code" in request_body:
+            logger.log().error("Invalid referral code")
             return JsonResponse(
                 {
                     "Status": "Error",
@@ -57,6 +59,7 @@ def register(request):
 
         # Username validation
         if User.find_user_by_username(User, username=request_body["username"]):
+            logger.log().error("Username is already exists")
             return JsonResponse(
                 {
                     "Status": "Error",
@@ -115,25 +118,63 @@ def register(request):
 
     logger.log().error("Method not allowed")
     return JsonResponse(
-        {"Status": "Error", "Message": "Method not allowed"},
+        {"Status": "Error", "Data": [], "Message": "Method not allowed"},
         status=HTTPStatus.METHOD_NOT_ALLOWED,
     )
 
 
+@require_http_methods(["POST"])
+@csrf_exempt
 def login(request):
-    pass
+    logger = Logger("login")
+    if (
+        request.method == "POST"
+        and request.headers["Content-Type"] == "application/json"
+    ):
+        pass
+
+    logger.log().error("Method not allowed")
+    return JsonResponse(
+        {"Status": "Error", "Data": [], "Message": "Method not allowed"},
+        status=HTTPStatus.METHOD_NOT_ALLOWED,
+    )
 
 
+@require_http_methods(["PUT"])
+@csrf_exempt
 def edit_profile(request):
     pass
 
 
+@require_http_methods(["POST"])
+@csrf_exempt
 def input_ref(request):
     pass
 
 
+@require_http_methods(["GET"])
 def find_user(request):
-    pass
+    logger = Logger("find_user")
+    if request.method == "GET":
+        response = []
+        query_params = request.GET.get("q", "")
+        query_params = query_params.lower()
+        list_user = User.objects.filter(username__icontains=query_params)
+        for user in list_user:
+            user_to_add = {
+                "id": user.id,
+                "username": user.username
+            }
+            response.append(user_to_add)
+        
+        logger.log().info("Successfully search user")
+        return JsonResponse({"Status": "Ok", "Data": response, "Message": "Successfully search user"})
+    
+    logger.log().error("Method not allowed")
+    return JsonResponse(
+        {"Status": "Error", "Message": "Method not allowed"},
+        status=HTTPStatus.METHOD_NOT_ALLOWED,
+    )
 
 
 @require_http_methods(["GET"])
@@ -146,34 +187,35 @@ def heroes(request, *args, **kwargs):
             champion_data = champion_data.json()
             champion_list = champion_data["data"]
             query_params = request.GET.get("q", "")
+            query_params = query_params.lower()
 
             if query_params in cache:
                 response_data = cache.get(query_params)
                 logger.log().info("Successfuly GET from Cache")
-                return JsonResponse({"Status": "Ok", "Data": response_data})
+                return JsonResponse({"Status": "Ok", "Data": response_data, "Message": "Successfully get heroes data"})
 
             if not query_params:
                 for hero, values in champion_list.items():
                     response.append(values)
                 logger.log().info("Successfully GET all heroes data")
                 cache.set("", response, timeout=CACHE_TTL)
-                return JsonResponse({"Status": "Ok", "Data": response})
+                return JsonResponse({"Status": "Ok", "Data": response, "Message": "Successfully get heroes data"})
 
             for hero, values in champion_list.items():
-                if query_params in hero:
+                if query_params in hero.lower():
                     response.append(values)
 
             logger.log().info("Successfully GET heroes data")
             cache.set(query_params, response, timeout=CACHE_TTL)
-            return JsonResponse({"Status": "Ok", "Data": response})
+            return JsonResponse({"Status": "Ok", "Data": response, "Message": "Successfully get heroes data"})
         except Exception as e:
             logger.log().error(str(e))
             return JsonResponse(
-                {"Status": "Error", "Message": "Error when fetching data"},
+                {"Status": "Error", "Data": [], "Message": "Error when fetching data"},
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
             )
     logger.log().error("Method not allowed")
     return JsonResponse(
-        {"Status": "Error", "Message": "Method not allowed"},
+        {"Status": "Error", "Data": [], "Message": "Method not allowed"},
         status=HTTPStatus.METHOD_NOT_ALLOWED,
     )
