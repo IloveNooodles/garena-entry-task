@@ -10,7 +10,9 @@ class User(models.Model):
     name = models.CharField(max_length=255)
     email = models.EmailField()
     referal_code = models.CharField(max_length=255)
-    referred_by = models.ForeignKey("self", on_delete=models.SET_NULL, blank=True, null=True)
+    referred_by = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, blank=True, null=True
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         editable=False,
@@ -25,17 +27,19 @@ class User(models.Model):
         return self.username
 
     def find_user_by_ref(self, ref_code):
-        try:
-            user = self.objects.get(referal_code=ref_code)
-            return user
-        except Exception as e:
-            log.error(str(e))
+        user = self.objects.filter(referal_code=ref_code)
+        if not user.exists():
             return None
 
+        return user.first()
+
     def find_user_by_username(self, username):
-        try:
-            user = self.objects.get(username=username)
-            return user
-        except Exception as e:
-            log.error(str(e))
+        user = self.objects.filter(username=username)
+        if not user.exists():
             return None
+
+        return user
+
+    def filter_user(self, filtered_username):
+        list_user = self.objects.filter(username__icontains=filtered_username)
+        return list_user

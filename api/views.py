@@ -9,6 +9,7 @@ from django.core.cache import cache
 from entry_task.logger import Logger
 from entry_task.hash import HashPassword
 from entry_task.jwt_auth import JWTAuth
+from entry_task.utils import is_parse_body_correct
 from http import HTTPStatus
 from api.models import User
 import json
@@ -29,9 +30,10 @@ def register(request):
         and request.headers["Content-Type"] == "application/json"
     ):
         request_body = json.loads(request.body)
+        keys_to_check = ["username", "password", "email", "name"]
 
         # check all the field
-        if "username" and "password" and "name" and "email" not in request_body:
+        if not is_parse_body_correct(request_body, keys_to_check):
             logger.log().error("Incomplete request body")
             return JsonResponse(
                 {
@@ -133,7 +135,7 @@ def login(request):
         and request.headers["Content-Type"] == "application/json"
     ):
         request_body = json.loads(request.body)
-        
+
         # Payload validation
         if "username" and "password" not in request_body:
             logger.log().error("Incomplete request body")
@@ -145,10 +147,10 @@ def login(request):
                 },
                 status=HTTPStatus.BAD_REQUEST,
             )
-        
+
         # Check for matching username
         user = User.find_user_by_username(User, request_body["username"])
-        
+
         if not user:
             logger.log().error("No user found ")
             return JsonResponse(
@@ -163,7 +165,7 @@ def login(request):
         # Check for password
         hashInstance = HashPassword(request_body["password"])
         is_matched = hashInstance.check(user.password)
-        
+
         if not is_matched:
             logger.log().error("Password didn't match")
             return JsonResponse(
@@ -174,19 +176,21 @@ def login(request):
                 },
                 status=HTTPStatus.UNPROCESSABLE_ENTITY,
             )
-        
+
         # Send the JWT
         payload = {
             "username": request_body["username"],
-            "password": request_body["password"]
+            "password": request_body["password"],
         }
-        
+
         jwtInstance = JWTAuth()
         token = jwtInstance.encode(payload)
 
         logger.log().info("Successfuly login")
-        return JsonResponse({"Status": "Ok", "Data": {"Token": token}, "Message": "Successfuly login"})
-        
+        return JsonResponse(
+            {"Status": "Ok", "Data": {"Token": token}, "Message": "Successfuly login"}
+        )
+
     logger.log().error("Method not allowed")
     return JsonResponse(
         {"Status": "Error", "Data": [], "Message": "Method not allowed"},
@@ -212,18 +216,17 @@ def find_user(request):
     if request.method == "GET":
         response = []
         query_params = request.GET.get("q", "")
-        query_params = query_params.lower()
-        list_user = User.objects.filter(username__icontains=query_params)
+        query_params = query_params
+        list_user = User.filter_user(User, query_params)
         for user in list_user:
-            user_to_add = {
-                "id": user.id,
-                "username": user.username
-            }
+            user_to_add = {"id": user.id, "username": user.username}
             response.append(user_to_add)
-        
+
         logger.log().info("Successfully search user")
-        return JsonResponse({"Status": "Ok", "Data": response, "Message": "Successfully search user"})
-    
+        return JsonResponse(
+            {"Status": "Ok", "Data": response, "Message": "Successfully search user"}
+        )
+
     logger.log().error("Method not allowed")
     return JsonResponse(
         {"Status": "Error", "Message": "Method not allowed"},
@@ -246,14 +249,26 @@ def heroes(request, *args, **kwargs):
             if query_params in cache:
                 response_data = cache.get(query_params)
                 logger.log().info("Successfuly GET from Cache")
-                return JsonResponse({"Status": "Ok", "Data": response_data, "Message": "Successfully get heroes data"})
+                return JsonResponse(
+                    {
+                        "Status": "Ok",
+                        "Data": response_data,
+                        "Message": "Successfully get heroes data",
+                    }
+                )
 
             if not query_params:
                 for hero, values in champion_list.items():
                     response.append(values)
                 logger.log().info("Successfully GET all heroes data")
                 cache.set("", response, timeout=CACHE_TTL)
-                return JsonResponse({"Status": "Ok", "Data": response, "Message": "Successfully get heroes data"})
+                return JsonResponse(
+                    {
+                        "Status": "Ok",
+                        "Data": response,
+                        "Message": "Successfully get heroes data",
+                    }
+                )
 
             for hero, values in champion_list.items():
                 if query_params in hero.lower():
@@ -261,7 +276,13 @@ def heroes(request, *args, **kwargs):
 
             logger.log().info("Successfully GET heroes data")
             cache.set(query_params, response, timeout=CACHE_TTL)
-            return JsonResponse({"Status": "Ok", "Data": response, "Message": "Successfully get heroes data"})
+            return JsonResponse(
+                {
+                    "Status": "Ok",
+                    "Data": response,
+                    "Message": "Successfully get heroes data",
+                }
+            )
         except Exception as e:
             logger.log().error(str(e))
             return JsonResponse(
