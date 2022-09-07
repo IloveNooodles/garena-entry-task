@@ -38,7 +38,7 @@ class User(models.Model):
         if not user.exists():
             return None
 
-        return user
+        return user.first()
 
     def filter_user(self, filtered_username):
         list_user = self.objects.filter(username__icontains=filtered_username)

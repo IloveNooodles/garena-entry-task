@@ -20,5 +20,5 @@ def response_error(status, message):
 
 def response_success(message, response, status=HTTPStatus.OK):
     return JsonResponse(
-        {"Status": "Error", "Data": response, "Message": message}, status=status
+        {"Status": "Ok", "Data": response, "Message": message}, status=status
     )
