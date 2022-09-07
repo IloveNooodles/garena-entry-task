@@ -1,5 +1,5 @@
 # Parser buat json/forms
-def is_parse_body_correct(dict, list_of_keys):
+def is_valid_body(dict, list_of_keys):
     for keys in list_of_keys:
         if keys not in dict:
             return False

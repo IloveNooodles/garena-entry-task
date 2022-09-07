@@ -1,17 +1,16 @@
 from datetime import datetime
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from django.conf import settings
 from django.core.cache import cache
 from entry_task.logger import Logger
 from entry_task.hash import HashPassword
 from entry_task.jwt_auth import JWTAuth
-from entry_task.utils import is_parse_body_correct
+from entry_task.utils import is_valid_body
 from http import HTTPStatus
 from api.models import User
+from api.utils import validate_email, response_error
 import json
 import requests
 import uuid
@@ -33,16 +32,9 @@ def register(request):
         keys_to_check = ["username", "password", "email", "name"]
 
         # check all the field
-        if not is_parse_body_correct(request_body, keys_to_check):
+        if not is_valid_body(request_body, keys_to_check):
             logger.log().error("Incomplete request body")
-            return JsonResponse(
-                {
-                    "Status": "Error",
-                    "Data": [],
-                    "Message": "Please fill the request body correctly",
-                },
-                status=HTTPStatus.BAD_REQUEST,
-            )
+            return response_error(HTTPStatus.BAD_REQUEST, "Please fill the request body correctly")
 
         # find user by ref code
         referred_user = None
@@ -51,40 +43,18 @@ def register(request):
 
         if not referred_user and "ref_code" in request_body:
             logger.log().error("Invalid referral code")
-            return JsonResponse(
-                {
-                    "Status": "Error",
-                    "Data": [],
-                    "Message": "No user found with inputted referral code",
-                },
-                status=HTTPStatus.NOT_FOUND,
-            )
+            return response_error(HTTPStatus.NOT_FOUND, "No user found with inputted referral code")
 
         # Username validation
         if User.find_user_by_username(User, username=request_body["username"]):
             logger.log().error("Username is already exists")
-            return JsonResponse(
-                {
-                    "Status": "Error",
-                    "Data": [],
-                    "Message": "Username is already exists",
-                },
-                status=HTTPStatus.CONFLICT,
-            )
-
+            return response_error(HTTPStatus.CONFLICT, "Username is already exists")
+              
         # Email validation
-        try:
-            validate_email(request_body["email"])
-        except ValidationError as e:
-            logger.log().error(str(e))
-            return JsonResponse(
-                {
-                    "Status": "Error",
-                    "Data": [],
-                    "Message": "Please provide correct email",
-                },
-                status=HTTPStatus.UNPROCESSABLE_ENTITY,
-            )
+        is_valid = validate_email(request_body["email"])
+        if not is_valid:
+            logger.log().error("Email is invalid")
+            return response_error(HTTPStatus.UNPROCESSABLE_ENTITY, "Please provide correct email")
 
         # Hash Password
         hashInstance = HashPassword(request_body["password"])
@@ -109,7 +79,7 @@ def register(request):
 
         user_to_add.save()
         response = request_body
-        response["password"] = hashed_password
+        response.pop("password")
         return JsonResponse(
             {
                 "Status": "Ok",
@@ -119,12 +89,9 @@ def register(request):
             status=HTTPStatus.CREATED,
         )
 
-    logger.log().error("Method not allowed")
-    return JsonResponse(
-        {"Status": "Error", "Data": [], "Message": "Method not allowed"},
-        status=HTTPStatus.METHOD_NOT_ALLOWED,
-    )
-
+    logger.log().error("Invalid method access")
+    return response_error(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
+  
 
 @require_http_methods(["POST"])
 @csrf_exempt
@@ -135,32 +102,18 @@ def login(request):
         and request.headers["Content-Type"] == "application/json"
     ):
         request_body = json.loads(request.body)
-
+        keys_to_check = ["username", "password"]
         # Payload validation
-        if "username" and "password" not in request_body:
+        if not is_valid_body(request_body, keys_to_check):
             logger.log().error("Incomplete request body")
-            return JsonResponse(
-                {
-                    "Status": "Error",
-                    "Data": [],
-                    "Message": "Please fill the request body correctly",
-                },
-                status=HTTPStatus.BAD_REQUEST,
-            )
+            return response_error(HTTPStatus.BAD_REQUEST, "Please fill the request body correctly")
 
         # Check for matching username
         user = User.find_user_by_username(User, request_body["username"])
 
         if not user:
             logger.log().error("No user found ")
-            return JsonResponse(
-                {
-                    "Status": "Error",
-                    "Data": [],
-                    "Message": "No user found",
-                },
-                status=HTTPStatus.NOT_FOUND,
-            )
+            return response_error(HTTPStatus.NOT_FOUND, "No user found")
 
         # Check for password
         hashInstance = HashPassword(request_body["password"])
@@ -168,19 +121,14 @@ def login(request):
 
         if not is_matched:
             logger.log().error("Password didn't match")
-            return JsonResponse(
-                {
-                    "Status": "Error",
-                    "Data": [],
-                    "Message": "Incorrect Password",
-                },
-                status=HTTPStatus.UNPROCESSABLE_ENTITY,
-            )
+            return response_error(HTTPStatus.UNPROCESSABLE_ENTITY, "Incorrect Password")
 
         # Send the JWT
         payload = {
             "username": request_body["username"],
-            "password": request_body["password"],
+            "ref_code": user.referal_code,
+            "id": user.id,
+            "name": user.name,
         }
 
         jwtInstance = JWTAuth()
@@ -192,10 +140,7 @@ def login(request):
         )
 
     logger.log().error("Method not allowed")
-    return JsonResponse(
-        {"Status": "Error", "Data": [], "Message": "Method not allowed"},
-        status=HTTPStatus.METHOD_NOT_ALLOWED,
-    )
+    return response_error(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
 
 
 @require_http_methods(["PUT"])
