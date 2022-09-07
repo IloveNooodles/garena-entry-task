@@ -173,10 +173,7 @@ def find_user(request):
         )
 
     logger.log().error("Method not allowed")
-    return JsonResponse(
-        {"Status": "Error", "Message": "Method not allowed"},
-        status=HTTPStatus.METHOD_NOT_ALLOWED,
-    )
+    return response_error(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
 
 
 @require_http_methods(["GET"])
@@ -230,12 +227,7 @@ def heroes(request, *args, **kwargs):
             )
         except Exception as e:
             logger.log().error(str(e))
-            return JsonResponse(
-                {"Status": "Error", "Data": [], "Message": "Error when fetching data"},
-                status=HTTPStatus.INTERNAL_SERVER_ERROR,
-            )
+            return response_error(HTTPStatus.INTERNAL_SERVER_ERROR, "Error when fetching data")
+
     logger.log().error("Method not allowed")
-    return JsonResponse(
-        {"Status": "Error", "Data": [], "Message": "Method not allowed"},
-        status=HTTPStatus.METHOD_NOT_ALLOWED,
-    )
+    return response_error(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
