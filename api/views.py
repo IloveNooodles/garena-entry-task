@@ -1,7 +1,7 @@
 from datetime import datetime
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
+# from django.http import JsonResponse
 from django.conf import settings
 from django.core.cache import cache
 from entry_task.logger import Logger
@@ -10,7 +10,7 @@ from entry_task.jwt_auth import JWTAuth
 from entry_task.utils import is_valid_body
 from http import HTTPStatus
 from api.models import User
-from api.utils import validate_email, response_error
+from api.utils import validate_email, response_error, response_success
 import json
 import requests
 import uuid
@@ -80,14 +80,7 @@ def register(request):
         user_to_add.save()
         response = request_body
         response.pop("password")
-        return JsonResponse(
-            {
-                "Status": "Ok",
-                "Data": response,
-                "Message": "Successfuly create new user",
-            },
-            status=HTTPStatus.CREATED,
-        )
+        return response_success("Successfuly create new user", response, status=HTTPStatus.CREATED)
 
     logger.log().error("Invalid method access")
     return response_error(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
@@ -135,9 +128,7 @@ def login(request):
         token = jwtInstance.encode(payload)
 
         logger.log().info("Successfuly login")
-        return JsonResponse(
-            {"Status": "Ok", "Data": {"Token": token}, "Message": "Successfuly login"}
-        )
+        return response_success("Successfuly login", {"Token": token})
 
     logger.log().error("Method not allowed")
     return response_error(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
@@ -168,9 +159,7 @@ def find_user(request):
             response.append(user_to_add)
 
         logger.log().info("Successfully search user")
-        return JsonResponse(
-            {"Status": "Ok", "Data": response, "Message": "Successfully search user"}
-        )
+        return response_success("Successfully search user", response)
 
     logger.log().error("Method not allowed")
     return response_error(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
@@ -191,26 +180,14 @@ def heroes(request, *args, **kwargs):
             if query_params in cache:
                 response_data = cache.get(query_params)
                 logger.log().info("Successfuly GET from Cache")
-                return JsonResponse(
-                    {
-                        "Status": "Ok",
-                        "Data": response_data,
-                        "Message": "Successfully get heroes data",
-                    }
-                )
+                return response_success("Successfully get heroes data", response_data)
 
             if not query_params:
                 for hero, values in champion_list.items():
                     response.append(values)
                 logger.log().info("Successfully GET all heroes data")
                 cache.set("", response, timeout=CACHE_TTL)
-                return JsonResponse(
-                    {
-                        "Status": "Ok",
-                        "Data": response,
-                        "Message": "Successfully get heroes data",
-                    }
-                )
+                return response_success("Successfully get heroes data", response)
 
             for hero, values in champion_list.items():
                 if query_params in hero.lower():
@@ -218,13 +195,8 @@ def heroes(request, *args, **kwargs):
 
             logger.log().info("Successfully GET heroes data")
             cache.set(query_params, response, timeout=CACHE_TTL)
-            return JsonResponse(
-                {
-                    "Status": "Ok",
-                    "Data": response,
-                    "Message": "Successfully get heroes data",
-                }
-            )
+            return response_success("Successfully get heroes data", response)
+
         except Exception as e:
             logger.log().error(str(e))
             return response_error(HTTPStatus.INTERNAL_SERVER_ERROR, "Error when fetching data")
