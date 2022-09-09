@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-# from django.http import JsonResponse
 from django.conf import settings
 from django.core.cache import cache
 from entry_task.logger import Logger
@@ -11,7 +10,12 @@ from entry_task.jwt_decorator import auth, decode_jwt
 from entry_task.utils import is_valid_body
 from http import HTTPStatus
 from api.models import User
-from api.utils import validate_email, response_error, response_success, get_username_from_session
+from api.utils import (
+    validate_email,
+    response_error,
+    response_success,
+    get_username_from_session,
+)
 import json
 import requests
 import uuid
@@ -35,7 +39,9 @@ def register(request):
         # check all the field
         if not is_valid_body(request_body, keys_to_check):
             logger.log().error("Incomplete request body")
-            return response_error(HTTPStatus.BAD_REQUEST, "Please fill the request body correctly")
+            return response_error(
+                HTTPStatus.BAD_REQUEST, "Please fill the request body correctly"
+            )
 
         # find user by ref code
         referred_user = None
@@ -44,18 +50,22 @@ def register(request):
 
         if not referred_user and "ref_code" in request_body:
             logger.log().error("Invalid referral code")
-            return response_error(HTTPStatus.NOT_FOUND, "No user found with inputted referral code")
+            return response_error(
+                HTTPStatus.NOT_FOUND, "No user found with inputted referral code"
+            )
 
         # Username validation
         if User.find_user_by_username(User, username=request_body["username"]):
             logger.log().error("Username is already exists")
             return response_error(HTTPStatus.CONFLICT, "Username is already exists")
-              
+
         # Email validation
         is_valid = validate_email(request_body["email"])
         if not is_valid:
             logger.log().error("Email is invalid")
-            return response_error(HTTPStatus.UNPROCESSABLE_ENTITY, "Please provide correct email")
+            return response_error(
+                HTTPStatus.UNPROCESSABLE_ENTITY, "Please provide correct email"
+            )
 
         # Hash Password
         hashInstance = HashPassword(request_body["password"])
@@ -81,11 +91,13 @@ def register(request):
         user_to_add.save()
         response = request_body
         response.pop("password")
-        return response_success("Successfuly create new user", response, status=HTTPStatus.CREATED)
+        return response_success(
+            "Successfuly create new user", response, status=HTTPStatus.CREATED
+        )
 
     logger.log().error("Invalid method access")
     return response_error(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
-  
+
 
 @require_http_methods(["POST"])
 @csrf_exempt
@@ -100,7 +112,9 @@ def login(request):
         # Payload validation
         if not is_valid_body(request_body, keys_to_check):
             logger.log().error("Incomplete request body")
-            return response_error(HTTPStatus.BAD_REQUEST, "Please fill the request body correctly")
+            return response_error(
+                HTTPStatus.BAD_REQUEST, "Please fill the request body correctly"
+            )
 
         # Check for matching username
         user = User.find_user_by_username(User, request_body["username"])
@@ -142,45 +156,49 @@ def login(request):
 @auth
 def edit_profile(request):
     logger = Logger("edit_profile")
-    if request.method == "PUT":
+    if (
+        request.method == "PUT"
+        and request.headers["Content-Type"] == "application/json"
+    ):
         request_body = json.loads(request.body)
-      
-        # Get info user from session
-        username = get_username_from_session(request)
+
+        # Get info user from request
+        username = request.user["username"]
+        print(request.user)
         selected_user = User.find_user_by_username(User, username)
-        
         if not selected_user:
             logger.log().error("No user found ")
             return response_error(HTTPStatus.NOT_FOUND, "No user found")
-        
+
         # If user want to change username
-        if "username" in request_body:          
+        if "username" in request_body:
             if User.find_user_by_username(User, username=request_body["username"]):
                 logger.log().error("Username is already exists")
                 return response_error(HTTPStatus.CONFLICT, "Username is already exists")
 
             selected_user.username = request_body["username"]
-        
+
         # Change name
         if "name" in request_body:
             selected_user.name = request_body["name"]
-        
+
         # Change email
         if "email" in request_body:
             is_email_valid = validate_email(request_body["email"])
             if not is_email_valid:
                 logger.log().error("Email is invalid")
-                return response_error(HTTPStatus.UNPROCESSABLE_ENTITY, "Please provide correct email")
-            
+                return response_error(
+                    HTTPStatus.UNPROCESSABLE_ENTITY, "Please provide correct email"
+                )
+
             selected_user.email = request_body["email"]
 
         # Save and send response
         selected_user.save()
         logger.log().error("Successfuly edit user")
         response = request_body
-        response.pop("token")
         return response_success("Successfuly Edit User", response)
-    logger.log().error("Method not allowed")
+    logger.log().info("Method not allowed")
     return response_error(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")
 
 
@@ -189,14 +207,17 @@ def edit_profile(request):
 @auth
 def input_ref(request):
     logger = Logger("find_user")
-    if request.method == "POST":
+    if (
+        request.method == "POST"
+        and request.headers["Content-Type"] == "application/json"
+    ):
         request_body = json.loads(request.body)
         if "ref_code" not in request_body:
             logger.log().error("Referal code is empty")
             return response_error(HTTPStatus.BAD_REQUEST, "referal code is empty")
 
         # Get User Info
-        username = get_username_from_session(request)
+        username = request.user["username"]
         selected_user = User.find_user_by_username(User, username)
 
         if not selected_user:
@@ -206,14 +227,18 @@ def input_ref(request):
         # if already input referral code
         if selected_user.referred_by:
             logger.log().error("User already entered referral code")
-            return response_error(HTTPStatus.BAD_REQUEST, "Referral code is already entered")
+            return response_error(
+                HTTPStatus.BAD_REQUEST, "Referral code is already entered"
+            )
 
         # Search user by ref code
         referred_by = User.find_user_by_ref(User, request_body["ref_code"])
 
         if not referred_by:
             logger.log().error("No user found with that referral code")
-            return response_error(HTTPStatus.NOT_FOUND, "No user found with referral code")
+            return response_error(
+                HTTPStatus.NOT_FOUND, "No user found with referral code"
+            )
 
         # Check if its the same id
         if referred_by.username == selected_user.username:
@@ -285,7 +310,9 @@ def heroes(request, *args, **kwargs):
 
         except Exception as e:
             logger.log().error(str(e))
-            return response_error(HTTPStatus.INTERNAL_SERVER_ERROR, "Error when fetching data")
+            return response_error(
+                HTTPStatus.INTERNAL_SERVER_ERROR, "Error when fetching data"
+            )
 
     logger.log().error("Method not allowed")
     return response_error(HTTPStatus.METHOD_NOT_ALLOWED, "Method not allowed")

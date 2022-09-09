@@ -12,24 +12,18 @@ def auth(func):
         logger = Logger("auth_middleware")
         try:
             # Ini kalo di header
-            # token = request.headers["Authorization"]
-            # token = decode_jwt(token)
-            # logger.log().info("User Autohrized")
-            # request.session["token"] = token
-            # request.session.set_expiry(7200)
-            request_body = json.loads(request.body) 
-            token = request_body["token"]
-            decode_jwt(token)
-            request.session["token"] = token
-            request.session.set_expiry(7200)
+            auth_header = request.headers["Authorization"]
+            token = auth_header.split(" ")[1]
+            decoded_token = decode_jwt(token)
+            request.user = decoded_token
             logger.log().info("User Autohrized")
             return func(request, *args, **kwargs)
         except Exception as e:
             logger.log().error(str(e))
-            return JsonResponse({
-              "Status": "Error",
-              "Message": "Unauthorized"
-            }, status=HTTPStatus.UNAUTHORIZED)
+            return JsonResponse(
+                {"Status": "Error", "Message": "Unauthorized"},
+                status=HTTPStatus.UNAUTHORIZED,
+            )
 
     return wrapper
 

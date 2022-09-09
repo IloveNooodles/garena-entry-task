@@ -14,5 +14,7 @@ class JWTAuth:
         return token
 
     def decode(self, token):
-        decoded_token = jwt.decode(jwt=token.encode("latin-1"), key=self.secret, algorithms="HS256")
+        decoded_token = jwt.decode(
+            jwt=token.encode("latin-1"), key=self.secret, algorithms="HS256"
+        )
         return decoded_token
